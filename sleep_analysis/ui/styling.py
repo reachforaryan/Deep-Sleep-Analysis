@@ -9,14 +9,55 @@ def apply_custom_css():
         padding-top: 2rem;
     }
     
-    /* Utility classes for text coloring */
-    .status-good { color: #09ab3b !important; }
-    .status-warning { color: #ffbd45 !important; }
-    .status-bad { color: #ff2b2b !important; }
+    /* Modern Card Styling */
+    .dashboard-card {
+        background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 1rem;
+        border: 1px solid #3d3d3d;
+        transition: transform 0.2s;
+    }
     
-    /* Metric styling overrides to ensure they pop */
-    div[data-testid="stMetricValue"] {
-        font-size: 24px;
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        border-color: #5d5d5d;
+    }
+
+    /* Gradient Text for Headlines */
+    .gradient-text {
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: bold;
+    }
+    
+    /* Metric Value Styling */
+    .metric-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #a0a0a0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Utility classes for status colors */
+    .status-good { color: #4ade80 !important; }
+    .status-warning { color: #fbbf24 !important; }
+    .status-bad { color: #f87171 !important; }
+    
+    /* Custom separator */
+    .separator {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #444, transparent);
+        margin: 2rem 0;
     }
     </style>
     """, unsafe_allow_html=True)

@@ -4,31 +4,30 @@ from .visualizations import create_visualization
 
 def render_analysis_buttons(analyzer):
     """Render buttons to trigger different analyses"""
-    st.write("### Run Analysis")
-    col1, col2, col3 = st.columns(3)
+    st.markdown("### Actions")
     
-    # Button to process sleep disorder prediction
-    with col1:
-        if st.button("Analyze Sleep Disorder Risk", key="analyze_disorder_btn"):
-            analyze_disorder(analyzer)
-    
-    # Button to process sleep quality prediction
-    with col2:
-        if st.button("Analyze Sleep Quality", key="analyze_quality_btn"):
-            analyze_quality(analyzer)
-    
-    # Button for audio analysis
-    with col3:
-        if 'temp_audio_path' in st.session_state:
-            if st.button("Analyze Audio Recording", key="analyze_audio_btn"):
-                analyze_audio(analyzer)
-        else:
-            st.button("Analyze Audio Recording", disabled=True, key="analyze_audio_btn_disabled")
-            st.info("Upload an audio file first")
-    
-    # Run all analyses at once
-    if st.button("Complete Full Analysis", key="full_analysis_btn", type="primary"):
+    # Primary Action
+    if st.button("Run Full Analysis", icon=":material/rocket_launch:", key="full_analysis_btn", type="primary", use_container_width=True):
         run_full_analysis(analyzer)
+        return True
+
+    with st.expander("Component Analysis"):
+        if st.button("Analyze Disorder Risk Only", key="analyze_disorder_btn", use_container_width=True):
+            analyze_disorder(analyzer)
+            return True
+    
+        if st.button("Analyze Quality Only", key="analyze_quality_btn", use_container_width=True):
+            analyze_quality(analyzer)
+            return True
+    
+        if 'temp_audio_path' in st.session_state:
+            if st.button("Analyze Audio Only", key="analyze_audio_btn", use_container_width=True):
+                analyze_audio(analyzer)
+                return True
+        else:
+            st.button("Analyze Audio Only", disabled=True, key="analyze_audio_btn_disabled", use_container_width=True)
+            
+    return False
 
 def analyze_disorder(analyzer):
     """Run sleep disorder analysis"""

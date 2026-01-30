@@ -5,9 +5,26 @@ from .visualizations import render_disorder_chart, render_snoring_results
 from .styling import apply_custom_css, card_container
 
 
+def render_metric_card(label, value, sub_value=None, status="neutral", icon=None):
+    """Helper to render a styled metric card using HTML"""
+    color = "#ffffff"
+    if status == "good": color = "#4ade80"
+    elif status == "warning": color = "#fbbf24"
+    elif status == "bad": color = "#f87171"
+    
+    icon_html = f'<span style="font-size: 1.5rem; margin-right: 8px;">{icon}</span>' if icon else ""
+    sub_html = f'<div style="font-size: 0.8rem; color: #888; margin-top: 4px;">{sub_value}</div>' if sub_value else ""
+    
+    st.markdown(f"""
+    <div class="dashboard-card">
+        <div class="metric-label">{label}</div>
+        <div class="metric-value" style="color: {color}">{icon_html}{value}</div>
+        {sub_html}
+    </div>
+    """, unsafe_allow_html=True)
+
 def render_results_tab(analyzer):
     """Orchestrate the rendering of all results"""
-    st.header("Comprehensive Sleep Analysis Results")
     
     # Check if any analysis has been done
     if not st.session_state.disorder_results and not st.session_state.quality_results and not st.session_state.audio_results:
@@ -23,158 +40,131 @@ def render_results_tab(analyzer):
             st.session_state.shared_inputs
         )
     
-
     # Apply CSS
     apply_custom_css()
     
-    # --- Row 1: Hero Metrics ---
+    st.markdown('<h1 class="gradient-text">Your Sleep Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # --- HERO ROW: The Big Numbers ---
     col1, col2, col3 = st.columns(3)
     
     # 1. Main Disorder Prediction
     with col1:
-        with card_container():
-            if st.session_state.disorder_results:
-                disorder = st.session_state.disorder_results['prediction']
-                st.caption("SLEEP DISORDER RISK")
-                
-                color_class = "status-good"
-                if disorder == "Insomnia": color_class = "status-warning"
-                elif disorder == "Sleep Apnea": color_class = "status-bad"
-                
-                # Using markdown with class for color
-                st.markdown(f'<h2 class="{color_class}">{disorder}</h2>', unsafe_allow_html=True)
-                
-                # Show max probability
-                if 'probabilities' in st.session_state.disorder_results:
+        if st.session_state.disorder_results:
+            disorder = st.session_state.disorder_results['prediction']
+            status = "good"
+            if disorder == "Insomnia": status = "warning"
+            elif disorder == "Sleep Apnea": status = "bad"
+            
+            # Get probability confidence
+            conf_msg = ""
+            if 'probabilities' in st.session_state.disorder_results:
                      probs = st.session_state.disorder_results['probabilities']
                      max_p = probs.get(disorder, 0) * 100
-                     st.caption(f"Confidence: {max_p:.1f}%")
-            else:
-                st.caption("SLEEP DISORDER RISK")
-                st.info("Analysis pending")
+                     conf_msg = f"{max_p:.1f}% Confidence Model"
 
-        
+            render_metric_card("Primary Assessment", disorder, conf_msg, status, icon="🏥")
+        else:
+            render_metric_card("Primary Assessment", "Pending", "Run analysis to see", "neutral")
+
     # 2. Sleep Quality Score
     with col2:
-        with card_container():
-            if st.session_state.quality_results:
-                score = st.session_state.quality_results['score']
-                st.caption("SLEEP QUALITY SCORE")
-                
-                color_class = "status-good"
-                if score <= 3: color_class = "status-bad"
-                elif score <= 7: color_class = "status-warning"
-                
-                st.markdown(f'<h2 class="{color_class}">{score:.1f} <span style="font-size:1rem;color:#999">/10</span></h2>', unsafe_allow_html=True)
-                st.progress(min(score/10, 1.0))
-            else:
-                st.caption("SLEEP QUALITY SCORE")
-                st.info("Analysis pending")
+        if st.session_state.quality_results:
+            score = st.session_state.quality_results['score']
+            # Using the new gauge visualization
+            with card_container():
+                from .visualizations import render_gauge_chart
+                render_gauge_chart(score)
+        else:
+            render_metric_card("Sleep Quality", "Pending", "Run analysis to see", "neutral")
         
     # 3. Snoring Severity
     with col3:
-        with card_container():
-            if st.session_state.audio_results:
-                res = st.session_state.audio_results
-                pct = res['snoring_percentage']
-                st.caption("SNORING SEVERITY")
-                
-                color_class = "status-good"
-                if pct > 50: color_class = "status-bad"
-                elif pct > 30: color_class = "status-warning"
-                
-                st.markdown(f'<h2 class="{color_class}">{pct:.1f}%</h2>', unsafe_allow_html=True)
-                st.caption(f"{res['total_snoring_duration']/60:.1f} mins of snoring")
-            else:
-                st.caption("SNORING SEVERITY")
-                st.info("Analysis pending")
+        if st.session_state.audio_results:
+            res = st.session_state.audio_results
+            pct = res['snoring_percentage']
+            status = "good"
+            if pct > 50: status = "bad"
+            elif pct > 30: status = "warning"
+            
+            duration_mins = res['total_snoring_duration']/60
+            render_metric_card("Snoring Load", f"{pct:.1f}%", f"{duration_mins:.1f} mins detected", status, icon="😴")
+        else:
+             render_metric_card("Snoring Load", "N/A", "Upload audio to analyze", "neutral")
 
-    # --- Row 2: Deep Dive ---
-    # Using st.columns for layout, individual cards for content
-    col_wide, col_narrow = st.columns([2, 1])
+    # --- ROW 2: VISUALIZATIONS ---
+    st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
     
-    with col_wide:
+    # Using a 2/3 + 1/3 split for charts
+    c_left, c_right = st.columns([2, 1])
+    
+    with c_left:
+        st.subheader(":material/show_chart: Audio Timeline")
         with card_container():
-            st.subheader("Audio Analysis")
             if st.session_state.audio_results:
                  render_snoring_results(st.session_state.audio_results, st.session_state.get('audio_fig'))
             else:
-                 st.info("No audio analysis available")
-        
-    with col_narrow:
+                 st.info("Additional audio insights will appear here.")
+    
+    with c_right:
+        st.subheader(":material/pie_chart: Risk Factors")
         with card_container():
-            st.subheader("Disorder Probabilities")
             if st.session_state.disorder_results:
                 render_disorder_chart(st.session_state.disorder_results)
             else:
-                st.info("No disorder analysis available")
-
-    # --- Row 3: Metrics Grid ---
-    st.markdown("### Key Physiological Metrics")
-    m1, m2, m3, m4 = st.columns(4)
+                st.info("Risk distribution will appear here.")
+    
+    # --- ROW 3: Vitals Grid ---
+    st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
+    st.subheader(":material/ecg_heart: Physiological Vitals")
     
     inputs = st.session_state.shared_inputs
+    m1, m2, m3, m4 = st.columns(4)
     
     with m1:
-        with card_container():
-            st.metric("Sleep Duration", f"{inputs.get('Sleep Duration', 0):.1f}h")
+        st.metric(":material/schedule: Duration", f"{inputs.get('Sleep Duration', 0):.1f}h")
     with m2:
-        with card_container():
-            st.metric("Heart Rate", f"{inputs.get('Heart Rate', 0)} bpm")
+        st.metric(":material/favorite: Heart Rate", f"{inputs.get('Heart Rate', 0)} bpm")
     with m3:
-        with card_container():
-            st.metric("Stress Level", f"{inputs.get('Stress Level', 0)}/10")
+         st.metric(":material/psychology: Stress", f"{inputs.get('Stress Level', 0)}/10")
     with m4:
-        with card_container():
-            st.metric("Physical Activity", f"{inputs.get('Physical Activity Level', 0)} m/day")
+         st.metric(":material/directions_run: Activity", f"{inputs.get('Physical Activity Level', 0)} min")
 
-    # --- Row 4: Recommendations ---
-    # --- Row 4: Recommendations (Hybrid Architecture) ---
-    with card_container():
-        st.subheader("Personalized Recommendations")
-        
-        # 1. Base Layer (Rule-Based)
-        render_recommendations_section()
-        
-        # 2. Boost Layer (AI Deep Dive)
-        st.markdown("---")
-        st.markdown("### 🤖 AI Sleep Coach")
-        st.caption("Get a deeper, holistic analysis connecting your lifestyle to your results using Google Gemini.")
-        
-        # API Key Input (collapsible if likely already set)
-        show_api_input = True
-        api_key = None
-        
-        try:
-            if "GEMINI_API_KEY" in st.secrets:
-                # If in secrets, we don't need to show it, or can show a message
-                api_key = st.secrets["GEMINI_API_KEY"]
-                show_api_input = False
-                st.success("API Key loaded from secrets")
-        except Exception:
-            # Secrets file not found or other error, fallback to manual input
-            pass
-            
-        if show_api_input:
-             api_key = st.text_input("Enter Google Gemini API Key", type="password", key="gemini_key_input")
-        
-        if st.button("Generate AI Deep Dive", type="primary", disabled=not api_key):
-             with st.spinner("Analyzing your sleep profile..."):
-                  insight = analyzer.generate_ai_insight(
-                      api_key, 
-                      st.session_state.shared_inputs,
-                      {
-                          'disorder_results': st.session_state.disorder_results,
-                          'quality_results': st.session_state.quality_results,
-                          'audio_results': st.session_state.audio_results
-                      }
-                  )
-                  st.success("Analysis Complete")
-                  st.markdown(insight)
+    # --- ROW 4: AI Insights & Recs ---
+    st.markdown('<div class="separator"></div>', unsafe_allow_html=True)
     
-    # Clear all results button
+    with st.expander("✨ AI & Recommendations", expanded=True, icon=":material/lightbulb:"):
+         # 1. Base Recommendations
+         render_recommendations_section()
+         
+         st.markdown("---")
+         st.markdown("### :material/smart_toy: AI Coach Analysis")
+         
+         # API Key Logic reused
+         api_key = None
+         if "GEMINI_API_KEY" in st.secrets:
+             api_key = st.secrets["GEMINI_API_KEY"]
+         else:
+             api_key = st.text_input("Enter Gemini API Key", type="password")
+             
+         if st.button("Generate Deep Dive Insight", type="primary", disabled=not api_key, use_container_width=True):
+             with st.spinner("Analyzing complex patterns..."):
+                  insight = analyzer.generate_ai_insight(
+                       api_key, 
+                       st.session_state.shared_inputs,
+                       {
+                           'disorder_results': st.session_state.disorder_results,
+                           'quality_results': st.session_state.quality_results,
+                           'audio_results': st.session_state.audio_results
+                       }
+                  )
+                  st.success("Insight Generated!")
+                  st.markdown(insight)
+
+    # Footer Action
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("Clear All Results", key="clear_results_btn"):
+    if st.button("Clear Dashboard", type="secondary"):
         clear_results()
 
 

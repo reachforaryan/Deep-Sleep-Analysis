@@ -14,8 +14,6 @@ from sleep_analysis.ui.results import render_results_tab
 def main():
     st.set_page_config(page_title="Comprehensive Sleep Analysis", layout="wide")
     
-    st.title("Comprehensive Sleep Analysis")
-    
     # Initialize analyzer
     @st.cache_resource
     def get_analyzer_v2():
@@ -27,10 +25,6 @@ def main():
     
     analyzer = get_analyzer_v2()
     
-    # Display information
-    st.write("This app provides a comprehensive analysis of your sleep quality, sleep disorders, and snoring patterns.")
-    st.write("Please provide the required information and upload an audio recording of your sleep for analysis.")
-
     # Initialize Session State
     if 'shared_inputs' not in st.session_state:
         st.session_state.shared_inputs = {}
@@ -42,22 +36,48 @@ def main():
         st.session_state.quality_results = None
     if 'combined_suggestions' not in st.session_state:
         st.session_state.combined_suggestions = None
+    if 'has_run_analysis' not in st.session_state:
+        st.session_state.has_run_analysis = False
     
-    # Create tabs
-    tab1, tab2 = st.tabs(["Input Data", "Analysis Results"])
-    
-    #############
-    # Tab 1: Input Data
-    #############
-    with tab1:
+    # --- Sidebar: Input Configuration ---
+    with st.sidebar:
+        st.title("Sleep Profile")
         render_inputs()
-        render_analysis_buttons(analyzer)
+        st.markdown("---")
+        # Pass a callback or handle button click to set 'has_run_analysis'
+        if render_analysis_buttons(analyzer):
+            st.session_state.has_run_analysis = True
+            # No need to rerun explicitly if the button triggers the analysis and updates state, 
+            # streamlits render loop will catch it.
     
-    #############
-    # Tab 2: Results & Recommendations
-    #############
-    with tab2:
+    # --- Main Area: Results or Welcome ---
+    if st.session_state.has_run_analysis:
+        st.markdown("# Analysis Results")
         render_results_tab(analyzer)
+    else:
+        # Welcome / Empty State
+        st.title("Comprehensive Sleep Analysis")
+        st.markdown("""
+        ### :material/waving_hand: Welcome!
+        
+        This application analyzes your sleep patterns using advanced physiological metrics and audio analysis.
+        
+        **How to use:**
+        1.  **Configure Profile**: Use the sidebar to enter your personal data and sleep habits.
+        2.  **Upload Audio**: Upload a sleep recording for snoring detection.
+        3.  **Analyze**: Click the button in the sidebar to generate insights.
+        
+        ---
+        <br>
+        """, unsafe_allow_html=True)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.info("**Advanced Metrics**\n\nAnalyzes medical-grade data like HRV and Body Temp.")
+        with c2:
+            st.info("**Audio Analysis**\n\nDetects storing and environmental noise patterns.")
+        with c3:
+            st.info("**Personalized Tips**\n\nGet actionable advice to improve your sleep quality.")
 
 if __name__ == "__main__":
     main()

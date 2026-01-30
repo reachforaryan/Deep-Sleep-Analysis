@@ -150,3 +150,39 @@ def render_disorder_chart(disorder_results):
         )
         
         st.plotly_chart(fig, width="stretch", config={'displayModeBar': False})
+
+def render_gauge_chart(score, max_score=10):
+    """Render a gauge chart for Sleep Quality Score"""
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': "Sleep Score", 'font': {'size': 24, 'color': '#ccc'}},
+        gauge = {
+            'axis': {'range': [None, max_score], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': "rgba(0,0,0,0)"}, # invisible bar, using steps
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 2,
+            'bordercolor': "#333",
+            'steps': [
+                {'range': [0, 3], 'color': '#ff4b4b'},
+                {'range': [3, 7], 'color': '#ffa421'},
+                {'range': [7, 10], 'color': '#21c354'}
+            ],
+            'threshold': {
+                'line': {'color': "white", 'width': 4},
+                'thickness': 0.75,
+                'value': score
+            }
+        }
+    ))
+    
+    fig.update_layout(
+        height=200, 
+        margin=dict(l=10, r=10, t=30, b=10),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        font={'color': "white"}
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'staticPlot': True})
