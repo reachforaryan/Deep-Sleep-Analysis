@@ -18,14 +18,14 @@ def main():
     
     # Initialize analyzer
     @st.cache_resource
-    def get_analyzer():
+    def get_analyzer_v2():
         return SleepAnalyzer(
             audio_model_path='models/sleep_audio_model.h5',
             disorder_model_path='models/sleep_disorder_model.pkl',
             quality_model_path='models/sleep_quality_model.pkl'
         )
     
-    analyzer = get_analyzer()
+    analyzer = get_analyzer_v2()
     
     # Display information
     st.write("This app provides a comprehensive analysis of your sleep quality, sleep disorders, and snoring patterns.")

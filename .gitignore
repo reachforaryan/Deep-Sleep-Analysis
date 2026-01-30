@@ -26,3 +26,6 @@ temp_audio_*.wav
 
 # Mac
 .DS_Store
+
+secrets.toml
+

@@ -380,13 +380,13 @@ class SleepAnalyzer:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return None
 
-    def generate_suggestions(self, audio_results=None, disorder_results=None, quality_results=None):
-        """Generate comprehensive suggestions based on all analysis results"""
+    def generate_suggestions(self, audio_results=None, disorder_results=None, quality_results=None, user_data=None):
+        """Generate comprehensive suggestions based on all analysis results and user data"""
         suggestions = []
         severity = "Unknown"
         general_suggestions = []
         
-        # Process audio results if available
+        # --- 1. Audio / Snoring Analysis ---
         if audio_results:
             snoring_percentage = audio_results['snoring_percentage']
             
@@ -412,7 +412,7 @@ class SleepAnalyzer:
                 suggestions.append("Consult with a sleep specialist as soon as possible.")
                 suggestions.append("Consider getting tested for sleep apnea.")
         
-        # Process disorder prediction if available
+        # --- 2. Disorder Prediction Analysis ---
         if disorder_results:
             disorder = disorder_results['prediction']
 
@@ -431,7 +431,7 @@ class SleepAnalyzer:
                 suggestions.append("Avoid alcohol and sedatives before sleep.")
                 suggestions.append("Sleep on your side rather than your back.")
         
-        # Process quality prediction if available
+        # --- 3. Sleep Quality Analysis ---
         if quality_results:
             quality_score = quality_results['score']
             
@@ -447,7 +447,36 @@ class SleepAnalyzer:
                 suggestions.append("Your sleep quality appears to be good based on physiological markers.")
                 suggestions.append("Continue your healthy sleep habits.")
         
-        # Add general recommendations
+        # --- 4. User Lifestyle Factors (Smart Logic) ---
+        if user_data:
+            # Caffeine Logic
+            caffeine = user_data.get('Caffeine_Intake_mg', 0)
+            if caffeine > 200:
+                 suggestions.append(f"Your caffeine intake ({caffeine}mg) is high. Reducing this, especially after 2 PM, may naturally improve your sleep quality.")
+            
+            # Stress Logic
+            stress = user_data.get('Stress Level', 5)
+            if stress > 6:
+                suggestions.append(f"High stress ({stress}/10) is a major sleep disruptor. Try 'Box Breathing' (4-4-4-4) for 5 minutes before bed.")
+            
+            # BMI & Apnea Logic
+            bmi_cat = user_data.get('BMI Category', 'Normal')
+            if bmi_cat in ['Overweight', 'Obese']:
+                 # If also snoring or apnea detected
+                 if (audio_results and audio_results.get('snoring_percentage', 0) > 30) or (disorder_results and disorder_results.get('prediction') == 'Sleep Apnea'):
+                     suggestions.insert(0, "**Priority**: Weight management is often the most effective non-invasive treatment for sleep apnea/snoring patterns.")
+            
+            # Activity Logic
+            activity = user_data.get('Physical Activity Level', 30)
+            if activity < 30:
+                suggestions.append("Increasing daily physical activity to at least 30 mins can significantly deepen your sleep cycles.")
+            
+            # Heart Rate Logic
+            hr = user_data.get('Heart Rate', 75)
+            if hr > 80:
+                suggestions.append(f"Your resting heart rate ({hr} bpm) is slightly elevated, which can affect sleep. Ensure you are well-hydrated and managing stress.")
+
+        # --- General Default ---
         general_suggestions = [
             "Maintain a healthy weight through diet and exercise.",
             "Avoid caffeine and heavy meals at least 4 hours before bedtime.",
@@ -462,3 +491,78 @@ class SleepAnalyzer:
             'specific_suggestions': suggestions,
             'general_suggestions': general_suggestions
         }
+
+    def generate_ai_insight(self, api_key, user_data, analysis_results):
+        """
+        Generate personalized sleep coaching using Google Gemini
+        """
+        try:
+            import google.generativeai as genai
+            
+            # Configure API
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            
+            # Construct User Profile
+            profile = f"""
+            User Profile:
+            - Age: {user_data.get('Age')}
+            - Gender: {user_data.get('Gender')}
+            - Occupation: {user_data.get('Occupation')}
+            - Sleep Duration: {user_data.get('Sleep Duration')} hours
+            - Reported Quality: {user_data.get('Quality of Sleep')}/10
+            - Stress Level: {user_data.get('Stress Level')}/10
+            - BMI Category: {user_data.get('BMI Category')}
+            - Heart Rate: {user_data.get('Heart Rate')}
+            - Physical Activity: {user_data.get('Physical Activity Level')} min/day
+            - Caffeine: {user_data.get('Caffeine_Intake_mg')} mg
+            """
+            
+            # Construct Analysis summary
+            analysis_summary = "Analysis Results:\n"
+            
+            if analysis_results.get('disorder_results'):
+                dr = analysis_results['disorder_results']
+                analysis_summary += f"- Predicted Disorder: {dr['prediction']}\n"
+                if 'probabilities' in dr:
+                     probs = dr['probabilities']
+                     max_p = probs.get(dr['prediction'], 0) * 100
+                     analysis_summary += f"  (Confidence: {max_p:.1f}%)\n"
+            
+            if analysis_results.get('quality_results'):
+                qr = analysis_results['quality_results']
+                analysis_summary += f"- Predicted Sleep Quality Score: {qr['score']:.1f}/10\n"
+                
+            if analysis_results.get('audio_results'):
+                ar = analysis_results['audio_results']
+                analysis_summary += f"- Snoring Severity: {ar['snoring_percentage']:.1f}% ({ar['total_snoring_duration']/60:.1f} mins)\n"
+                
+            # Construct the prompt
+            prompt = f"""
+            You are an expert Sleep Specialist and Health Coach. Review the following patient profile and automated analysis results.
+            
+            {profile}
+            
+            {analysis_summary}
+            
+            Compared to standard rule-based advice, I need you to provide a "Doctor's Insight" that finds CORRELATIONS between the lifestyle factors and the results.
+            
+            Output your response in clean Markdown format with the following sections:
+            1. **Holistic Assessment**: 2-3 sentences connecting the dots (e.g. how their occupation or stress relates to the predicted disorder or snoring).
+            2. **Targeted Interventions**: 3 specific, actionable steps that address the root causes found in the data (e.g. specific timing for caffeine based on their bedtime).
+            3. **Urgency Check**: A brief note on whether they should perform any medical follow-up based on the severity.
+            
+            Tone: Empathetic, professional, analytical, yet accessible. 
+            """
+            
+            # Generate
+            response = model.generate_content(prompt)
+            return response.text
+            
+        except ImportError:
+            return "Error: google-generativeai package not installed."
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "Quota exceeded" in error_msg:
+                return "⚠️ **AI Overload**: The free analysis quota has been temporarily reached. Please wait about 30 seconds and try again."
+            return f"Error generating AI insight: {error_msg}"

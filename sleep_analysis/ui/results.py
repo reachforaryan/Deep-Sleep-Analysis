@@ -19,7 +19,8 @@ def render_results_tab(analyzer):
         st.session_state.combined_suggestions = analyzer.generate_suggestions(
             st.session_state.audio_results,
             st.session_state.disorder_results,
-            st.session_state.quality_results
+            st.session_state.quality_results,
+            st.session_state.shared_inputs
         )
     
 
@@ -128,9 +129,48 @@ def render_results_tab(analyzer):
             st.metric("Physical Activity", f"{inputs.get('Physical Activity Level', 0)} m/day")
 
     # --- Row 4: Recommendations ---
+    # --- Row 4: Recommendations (Hybrid Architecture) ---
     with card_container():
         st.subheader("Personalized Recommendations")
+        
+        # 1. Base Layer (Rule-Based)
         render_recommendations_section()
+        
+        # 2. Boost Layer (AI Deep Dive)
+        st.markdown("---")
+        st.markdown("### 🤖 AI Sleep Coach")
+        st.caption("Get a deeper, holistic analysis connecting your lifestyle to your results using Google Gemini.")
+        
+        # API Key Input (collapsible if likely already set)
+        show_api_input = True
+        api_key = None
+        
+        try:
+            if "GEMINI_API_KEY" in st.secrets:
+                # If in secrets, we don't need to show it, or can show a message
+                api_key = st.secrets["GEMINI_API_KEY"]
+                show_api_input = False
+                st.success("API Key loaded from secrets")
+        except Exception:
+            # Secrets file not found or other error, fallback to manual input
+            pass
+            
+        if show_api_input:
+             api_key = st.text_input("Enter Google Gemini API Key", type="password", key="gemini_key_input")
+        
+        if st.button("Generate AI Deep Dive", type="primary", disabled=not api_key):
+             with st.spinner("Analyzing your sleep profile..."):
+                  insight = analyzer.generate_ai_insight(
+                      api_key, 
+                      st.session_state.shared_inputs,
+                      {
+                          'disorder_results': st.session_state.disorder_results,
+                          'quality_results': st.session_state.quality_results,
+                          'audio_results': st.session_state.audio_results
+                      }
+                  )
+                  st.success("Analysis Complete")
+                  st.markdown(insight)
     
     # Clear all results button
     st.markdown("<br>", unsafe_allow_html=True)
