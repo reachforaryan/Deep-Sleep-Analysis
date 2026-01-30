@@ -59,7 +59,17 @@ def apply_custom_css():
         background: linear-gradient(90deg, transparent, #444, transparent);
         margin: 2rem 0;
     }
+    
+    /* Material Icons alignment */
+    .material-symbols-rounded {
+        vertical-align: middle;
+        font-size: 1.5rem !important; 
+        margin-right: 8px;
+    }
     </style>
+    
+    <!-- Material Symbols Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
     """, unsafe_allow_html=True)
 
 def card_container(key=None):

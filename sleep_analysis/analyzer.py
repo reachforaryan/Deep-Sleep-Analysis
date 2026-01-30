@@ -255,10 +255,22 @@ class SleepAnalyzer:
             # Steps Adequacy
             sample_df['Steps Adequacy'] = sample_df['Daily Steps'] / 10000
             
-            # Encode categorical features
+            # Encode categorical features with Safety Check
             for col in categorical_columns:
                 if col in sample_df.columns:
-                    sample_df[col] = label_encoders[col].transform(sample_df[col])
+                    val = sample_df[col].iloc[0]
+                    encoder = label_encoders[col]
+                    
+                    # Check if value exists in encoder classes
+                    if val not in encoder.classes_:
+                        logger.warning(f"Value '{val}' not found in encoder for '{col}'. Using fallback.")
+                        # Fallback strategy: Use the first class or a specific default if available
+                        # For Occupation 'Athlete', 'Other' is not in list, so let's pick a neutral one like 'Engineer' or just the mode
+                        # Safest is usually index 0 or similar to avoid crash
+                        fallback_val = encoder.classes_[0]
+                        sample_df[col] = encoder.transform([fallback_val])
+                    else:
+                        sample_df[col] = encoder.transform(sample_df[col])
             
             # Scale numerical features
             sample_df[numerical_columns] = scaler.transform(sample_df[numerical_columns])
@@ -545,14 +557,17 @@ class SleepAnalyzer:
             
             {analysis_summary}
             
-            Compared to standard rule-based advice, I need you to provide a "Doctor's Insight" that finds CORRELATIONS between the lifestyle factors and the results.
+            Compared to standard rule-based advice, I need you to find CORRELATIONS between the lifestyle factors and the results.
             
-            Output your response in clean Markdown format with the following sections:
-            1. **Holistic Assessment**: 2-3 sentences connecting the dots (e.g. how their occupation or stress relates to the predicted disorder or snoring).
-            2. **Targeted Interventions**: 3 specific, actionable steps that address the root causes found in the data (e.g. specific timing for caffeine based on their bedtime).
-            3. **Urgency Check**: A brief note on whether they should perform any medical follow-up based on the severity.
+            Strictly output your response as a valid JSON object with the following schema:
+            {{
+                "summary": "String. 2-3 sentences holistic assessment connecting the dots (e.g. how occupation or stress relates to disorder).",
+                "risk_factors": ["String", "String", "String"], /* List of 3 specific risk factors identified from data correlations */
+                "action_items": ["String", "String", "String"], /* List of 3 actionable, specific interventions */
+                "urgency": "String. Brief note on medical follow-up necessity."
+            }}
             
-            Tone: Empathetic, professional, analytical, yet accessible. 
+            Do not include any markdown formatting (like ```json). Return only the raw JSON string.
             """
             
             # Generate
