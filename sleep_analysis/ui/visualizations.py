@@ -1,76 +1,95 @@
 import streamlit as st
-import matplotlib.pyplot as plt
 import librosa
-import librosa.display
 import pandas as pd
 import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 def create_visualization(audio_path, results, sr=8000):
-    """Create visualization of audio analysis results"""
+    """Create interactive Plotly visualization of audio analysis results"""
     try:
         # Load audio for visualization
         y, _ = librosa.load(audio_path, sr=sr)
         
-        # Create figure
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+        # Downsample for faster plotting if array is too large
+        # Keep max ~20k points for performance
+        max_points = 20000
+        if len(y) > max_points:
+            hop = len(y) // max_points
+            y_plot = y[::hop]
+            x_plot = np.arange(len(y))[::hop] / sr
+        else:
+            y_plot = y
+            x_plot = np.arange(len(y)) / sr
+
+        # Create subplots: Row 1 = Waveform, Row 2 = Snoring Probability
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.1,
+            subplot_titles=("Audio Waveform", "Snoring Events"),
+            row_heights=[0.7, 0.3]
+        )
         
-        # Plot waveform
-        librosa.display.waveshow(y, sr=sr, ax=ax1, alpha=0.6)
-        ax1.set_title('Audio Waveform with Snoring Segments Highlighted')
-        ax1.set_xlabel('Time (s)')
+        # 1. Audio Waveform
+        fig.add_trace(
+            go.Scatter(x=x_plot, y=y_plot, mode='lines', name='Audio', 
+                      line=dict(color='#4c78a8', width=1), opacity=0.8),
+            row=1, col=1
+        )
         
-        # Highlight snoring segments on waveform
-        for start, end in results['snoring_segments']:
-            ax1.axvspan(start, end, color='red', alpha=0.3)
+        # Highlight snoring segments on waveform (using shapes or filled area)
+        # For better performance with many segments, we can create a mask overlay
         
-        # Create snoring timeline
+        # 2. Snoring Timeline (Binary/Timeline)
+        # Construct timeline for plotting
         x_timeline = []
         y_timeline = []
         
-        # Create timeline data
-        max_time = len(y) / sr
-        timeline_resolution = max(1, int(max_time / 300))  # One point per timeline_resolution seconds
+        duration = len(y) / sr
+        resolution = 1.0 # 1 second resolution for timeline bar
         
-        for i in range(0, int(max_time), timeline_resolution):
-            x_timeline.append(i)
-            
-            # Check if this time point is in a snoring segment
-            in_snoring_segment = False
+        current_time = 0
+        while current_time < duration:
+            is_snoring = 0
+            # Check if current second is within any snoring segment
             for start, end in results['snoring_segments']:
-                if start <= i <= end:
-                    in_snoring_segment = True
+                # Simple overlap check
+                if start <= current_time <= end or start <= current_time+resolution <= end:
+                    is_snoring = 1
                     break
             
-            y_timeline.append(1 if in_snoring_segment else 0)
-        
-        # Plot timeline
-        ax2.plot(x_timeline, y_timeline, 'b-', linewidth=2)
-        ax2.set_title('Snoring Timeline (1 = Snoring, 0 = No Snoring)')
-        ax2.set_xlabel('Time (s)')
-        ax2.set_yticks([0, 1])
-        ax2.set_yticklabels(['No Snoring', 'Snoring'])
-        ax2.grid(True)
-        
-        # Add summary statistics as text annotation
-        summary_text = (
-            f"Total Duration: {results['total_duration_minutes']:.2f} minutes\n"
-            f"Snoring Duration: {results['total_snoring_duration'] / 60:.2f} minutes\n"
-            f"Snoring Percentage: {results['snoring_percentage']:.2f}%\n"
-            f"Snoring Episodes: {results['snoring_segments_count']}\n"
-            f"Snoring Frequency: {results['snoring_frequency']:.2f} episodes/hour"
+            x_timeline.append(current_time)
+            y_timeline.append(is_snoring)
+            current_time += resolution
+            
+        fig.add_trace(
+            go.Bar(x=x_timeline, y=y_timeline, name='Snoring',
+                  marker_color='#e45756', opacity=0.6),
+            row=2, col=1
+        )
+
+        # Update layout
+        fig.update_layout(
+            height=400,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            hovermode="x unified"
         )
         
-        # Add text box for summary
-        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-        ax2.text(0.02, 0.3, summary_text, transform=ax2.transAxes, fontsize=10,
-                verticalalignment='top', bbox=props)
-        
-        plt.tight_layout()
+        fig.update_yaxes(title_text="Amplitude", row=1, col=1)
+        fig.update_yaxes(title_text="Event", row=2, col=1, tickvals=[0, 1], ticktext=["No", "Yes"])
+        fig.update_xaxes(title_text="Time (s)", row=2, col=1)
         
         return fig
         
     except Exception as e:
         st.error(f"Error creating visualization: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
         return None
 
 def render_snoring_results(audio_results, audio_fig=None):
@@ -78,40 +97,56 @@ def render_snoring_results(audio_results, audio_fig=None):
     if audio_results:
         results = audio_results
         
-        # Display snoring severity prominently
-        if results['snoring_percentage'] < 10:
-            st.success(f"### Minimal Snoring: {results['snoring_percentage']:.1f}%")
-        elif results['snoring_percentage'] < 30:
-            st.info(f"### Mild Snoring: {results['snoring_percentage']:.1f}%")
-        elif results['snoring_percentage'] < 50:
-            st.warning(f"### Moderate Snoring: {results['snoring_percentage']:.1f}%")
-        else:
-            st.error(f"### Severe Snoring: {results['snoring_percentage']:.1f}%")
+        # Display snoring severity prominently (Summary Text for the card)
+        pct = results['snoring_percentage']
         
-        # Show key metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Recording Duration", f"{results['total_duration_minutes']:.1f} min")
-        with col2:
-            st.metric("Snoring Duration", f"{results['total_snoring_duration'] / 60:.1f} min")
-        with col3:
-            st.metric("Snoring Episodes", f"{results['snoring_segments_count']}")
+        # Show key metrics in columns (Optional, if not already shown in Hero card, but good for context above chart)
+        # Keeping it minimal as per bento design, focusing on the chart
         
         # Display visualization if available
         if audio_fig is not None:
-            st.write("#### Snoring Pattern Visualization")
-            st.pyplot(audio_fig)
+            # Interactive Plotly Chart
+            st.plotly_chart(audio_fig, use_container_width=True, config={'displayModeBar': False})
+            
+            # Additional details below chart
+            st.caption(f"Detected {results['snoring_segments_count']} snoring episodes over {results['total_duration_minutes']:.1f} minutes.")
+            
     else:
         st.info("Audio analysis not completed.")
 
 def render_disorder_chart(disorder_results):
-    """Render chart for disorder probabilities"""
+    """Render chart for disorder probabilities using Plotly"""
     if 'probabilities' in disorder_results and disorder_results['probabilities'] is not None:
         # Get class probabilities
         probs_dict = disorder_results['probabilities']
         
-        # Convert the dict to a DataFrame directly
+        # Convert to DataFrame
         prob_data = pd.DataFrame(list(probs_dict.items()), columns=['Disorder', 'Probability'])
+        prob_data['Probability'] = prob_data['Probability'] * 100 # Convert to percentage
         
-        st.write("#### Disorder Probabilities")
-        st.bar_chart(prob_data.set_index('Disorder'))
+        # Create Plotly Bar Chart
+        fig = px.bar(
+            prob_data, 
+            x='Disorder', 
+            y='Probability',
+            color='Disorder',
+            text='Probability',
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        
+        fig.update_traces(
+            texttemplate='%{text:.1f}%', 
+            textposition='outside'
+        )
+        
+        fig.update_layout(
+            height=300,
+            margin=dict(l=20, r=20, t=20, b=20),
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            yaxis=dict(title='Probability (%)', range=[0, 110]),
+            xaxis=dict(title=None)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
