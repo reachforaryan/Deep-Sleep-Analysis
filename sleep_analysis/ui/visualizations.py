@@ -106,7 +106,7 @@ def render_snoring_results(audio_results, audio_fig=None):
         # Display visualization if available
         if audio_fig is not None:
             # Interactive Plotly Chart
-            st.plotly_chart(audio_fig, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(audio_fig, width="stretch", config={'displayModeBar': False})
             
             # Additional details below chart
             st.caption(f"Detected {results['snoring_segments_count']} snoring episodes over {results['total_duration_minutes']:.1f} minutes.")
@@ -149,4 +149,4 @@ def render_disorder_chart(disorder_results):
             xaxis=dict(title=None)
         )
         
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig, width="stretch", config={'displayModeBar': False})
