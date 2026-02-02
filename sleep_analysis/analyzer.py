@@ -513,7 +513,7 @@ class SleepAnalyzer:
             
             # Configure API
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
             
             # Construct User Profile
             profile = f"""
@@ -578,6 +578,6 @@ class SleepAnalyzer:
             return "Error: google-generativeai package not installed."
         except Exception as e:
             error_msg = str(e)
-            if "429" in error_msg or "Quota exceeded" in error_msg:
-                return "⚠️ **AI Overload**: The free analysis quota has been temporarily reached. Please wait about 30 seconds and try again."
+            # if "429" in error_msg or "Quota exceeded" in error_msg:
+                # return "⚠️ **AI Overload**: The free analysis quota has been temporarily reached. Please wait about 30 seconds and try again."
             return f"Error generating AI insight: {error_msg}"
